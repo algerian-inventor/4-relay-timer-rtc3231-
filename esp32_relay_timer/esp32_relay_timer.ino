@@ -66,10 +66,13 @@ static void writeRelay(bool on) {
 }
 
 static void stopBell(const char* reason) {
-  if (!bellRinging) return;
-
+  // Always command the physical GPIO OFF, even if software state already
+  // believes the bell is stopped. This makes manual stop fail-safe.
+  const bool wasRinging = bellRinging;
   writeRelay(false);
   bellRinging = false;
+
+  if (!wasRinging) return;
 
   String message = "Bell OFF";
   if (reason && strlen(reason)) message += " • " + String(reason);
@@ -215,7 +218,13 @@ static bool readJson(JsonDocument& doc) {
     return false;
   }
 
-  const DeserializationError error = deserializeJson(doc, server.arg("plain"));
+  const String body = server.arg("plain");
+  if (body.length() > 2048) {
+    server.send(413, "application/json", "{\"error\":\"body_too_large\"}");
+    return false;
+  }
+
+  const DeserializationError error = deserializeJson(doc, body);
   if (error) {
     server.send(400, "application/json", "{\"error\":\"invalid_json\"}");
     return false;
@@ -468,6 +477,11 @@ void setup() {
   Wire.setTimeOut(50);
   rtcReady = rtc.begin();
   rtcValid = rtcReady && !rtc.lostPower();
+
+  if (rtcValid) {
+    const DateTime now = rtc.now();
+    rtcValid = now.year() >= 2024 && now.year() <= 2099;
+  }
 
   Storage::begin(settings);
   Storage::loadLastTrigger(lastTriggerStamp, lastTriggerSlot);
