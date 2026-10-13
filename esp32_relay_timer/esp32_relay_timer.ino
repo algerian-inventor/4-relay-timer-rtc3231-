@@ -18,17 +18,14 @@ DNSServer dnsServer;
 PersistedSettings settings;
 EventLog eventLog;
 
-bool rtcDetected = false;
+bool rtcReady = false;
 bool rtcValid = false;
-bool apStarted = false;
+bool apReady = false;
+bool bellRinging = false;
 
-bool relayOn = false;
-uint32_t relayOffDeadlineMs = 0;
-
-bool schedulerPrimed = false;
-uint32_t observedMinuteToken = 0;
-uint32_t lastTriggeredMinuteToken = 0;
-uint32_t lastRtcHealthCheckMs = 0;
+unsigned long bellOffAtMs = 0;
+uint32_t lastTriggerStamp = 0;
+uint8_t lastTriggerSlot = 0xFF;
 
 static String twoDigits(uint8_t value) {
   return value < 10 ? "0" + String(value) : String(value);
@@ -38,41 +35,29 @@ static String minuteText(uint16_t minuteOfDay) {
   return twoDigits(minuteOfDay / 60) + ":" + twoDigits(minuteOfDay % 60);
 }
 
+static String timestampNow() {
+  if (!rtcReady) return "RTC unavailable";
+  if (!rtcValid) return "RTC not set";
+
+  const DateTime now = rtc.now();
+  return twoDigits(now.hour()) + ":" + twoDigits(now.minute()) + ":" + twoDigits(now.second());
+}
+
+static uint32_t makeTriggerStamp(const DateTime& now) {
+  const uint32_t dateKey =
+      ((static_cast<uint32_t>(now.year()) * 13UL + now.month()) * 32UL + now.day());
+  return dateKey * 1440UL + static_cast<uint32_t>(now.hour()) * 60UL + now.minute();
+}
+
 static bool isLeapYear(uint16_t year) {
   return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
 
 static uint8_t daysInMonth(uint16_t year, uint8_t month) {
-  static const uint8_t days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+  static const uint8_t DAYS[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
   if (month < 1 || month > 12) return 0;
   if (month == 2 && isLeapYear(year)) return 29;
-  return days[month - 1];
-}
-
-static bool validDateTimeFields(
-  int year, int month, int day, int hour, int minute, int second
-) {
-  if (year < 2024 || year > 2099) return false;
-  if (month < 1 || month > 12) return false;
-  if (day < 1 || day > daysInMonth(year, month)) return false;
-  if (hour < 0 || hour > 23) return false;
-  if (minute < 0 || minute > 59) return false;
-  if (second < 0 || second > 59) return false;
-  return true;
-}
-
-static String timestampNow() {
-  if (!rtcValid) return "RTC invalid";
-  const DateTime now = rtc.now();
-  return twoDigits(now.hour()) + ":" +
-         twoDigits(now.minute()) + ":" +
-         twoDigits(now.second());
-}
-
-static uint32_t minuteToken(const DateTime& now) {
-  const uint32_t minuteOfDay = now.hour() * 60U + now.minute();
-  return ((((uint32_t)now.year() * 13U + now.month()) * 32U + now.day()) * 1440U)
-         + minuteOfDay;
+  return DAYS[month - 1];
 }
 
 static void writeRelay(bool on) {
@@ -81,120 +66,80 @@ static void writeRelay(bool on) {
 }
 
 static void stopBell(const char* reason) {
-  if (!relayOn) {
-    writeRelay(false);
-    return;
-  }
+  if (!bellRinging) return;
 
   writeRelay(false);
-  relayOn = false;
+  bellRinging = false;
 
   String message = "Bell OFF";
   if (reason && strlen(reason)) message += " • " + String(reason);
   eventLog.add(timestampNow(), message);
 }
 
-static void startBellPulse(uint8_t durationSec, const char* reason) {
-  if (!validBellDuration(durationSec)) {
-    durationSec = DEFAULT_BELL_DURATION_SECONDS;
-  }
+static bool startBell(uint8_t durationSeconds, const char* reason) {
+  if (durationSeconds < 1 || durationSeconds > MAX_BELL_DURATION_SECONDS) return false;
 
-  writeRelay(true);
+  if (!bellRinging) {
+    writeRelay(true);
+    bellRinging = true;
 
-  if (!relayOn) {
-    relayOn = true;
     String message = "Bell ON";
     if (reason && strlen(reason)) message += " • " + String(reason);
-    message += " • " + String(durationSec) + "s";
     eventLog.add(timestampNow(), message);
   }
 
-  // Non-blocking deadline. A new pulse safely replaces/extends the current one.
-  relayOffDeadlineMs = millis() + (uint32_t)durationSec * 1000UL;
+  // Non-blocking pulse. A new ring request restarts the timeout safely.
+  bellOffAtMs = millis() + static_cast<unsigned long>(durationSeconds) * 1000UL;
+  return true;
 }
 
-static void serviceRelayTimeout() {
-  if (!relayOn) return;
+static void serviceBellPulse() {
+  if (!bellRinging) return;
 
-  if ((int32_t)(millis() - relayOffDeadlineMs) >= 0) {
+  if (static_cast<int32_t>(millis() - bellOffAtMs) >= 0) {
     stopBell("pulse complete");
   }
 }
 
-static void resetSchedulerBaseline() {
-  schedulerPrimed = false;
-  observedMinuteToken = 0;
-}
-
-static void refreshRtcHealth() {
-  if (!rtcDetected) {
-    rtcValid = false;
-    return;
-  }
-
-  if (millis() - lastRtcHealthCheckMs < 1000UL) return;
-  lastRtcHealthCheckMs = millis();
-
-  bool healthy = !rtc.lostPower();
-
-  if (healthy) {
-    const DateTime now = rtc.now();
-    healthy = now.year() >= 2024 && now.year() <= 2099;
-  }
-
-  if (rtcValid && !healthy) {
-    stopBell("RTC fault");
-    resetSchedulerBaseline();
-    eventLog.add("RTC", "Automatic schedule paused because RTC time is invalid");
-  }
-
-  rtcValid = healthy;
-}
-
-static void serviceSchedule() {
-  if (!rtcValid || !settings.automationEnabled) {
-    resetSchedulerBaseline();
+static void markCurrentMinuteTriggered(uint8_t slot = 0xFF) {
+  if (!rtcValid) {
+    lastTriggerStamp = 0;
+    lastTriggerSlot = 0xFF;
+    Storage::clearLastTrigger();
     return;
   }
 
   const DateTime now = rtc.now();
-  const uint32_t token = minuteToken(now);
+  lastTriggerStamp = makeTriggerStamp(now);
+  lastTriggerSlot = slot;
+  Storage::saveLastTrigger(lastTriggerStamp, lastTriggerSlot);
+}
 
-  // On boot or after a clock/mode change, observe the current minute first.
-  // This intentionally avoids an accidental repeat ring if power returns
-  // halfway through a scheduled minute.
-  if (!schedulerPrimed) {
-    observedMinuteToken = token;
-    schedulerPrimed = true;
-    return;
-  }
+static void serviceScheduler() {
+  if (!settings.automationEnabled || !rtcValid) return;
 
-  if (token == observedMinuteToken) return;
-  observedMinuteToken = token;
+  const DateTime now = rtc.now();
 
-  if (token == lastTriggeredMinuteToken) return;
+  // Only trigger close to xx:xx:00. This avoids ringing late after a reboot.
+  if (now.second() > TRIGGER_WINDOW_SECONDS) return;
 
-  const uint8_t day = now.dayOfTheWeek();
-  const uint16_t minuteOfDay = now.hour() * 60U + now.minute();
+  const uint16_t minuteOfDay = static_cast<uint16_t>(now.hour()) * 60U + now.minute();
+  const uint32_t stamp = makeTriggerStamp(now);
 
-  uint8_t matched = 0;
-  uint8_t durationSec = 0;
+  // One automatic ring maximum per calendar minute, persisted across resets.
+  if (stamp == lastTriggerStamp) return;
 
   for (uint8_t i = 0; i < MAX_BELL_EVENTS; ++i) {
     const BellEvent& event = settings.events[i];
-    if (!eventMatches(event, day, minuteOfDay)) continue;
+    if (!eventMatches(event, now.dayOfTheWeek(), minuteOfDay)) continue;
 
-    ++matched;
-    if (event.durationSec > durationSec) durationSec = event.durationSec;
-  }
+    lastTriggerStamp = stamp;
+    lastTriggerSlot = i;
+    Storage::saveLastTrigger(lastTriggerStamp, lastTriggerSlot);
 
-  if (matched == 0) return;
-
-  lastTriggeredMinuteToken = token;
-  startBellPulse(durationSec, "scheduled");
-
-  if (matched > 1) {
-    eventLog.add(timestampNow(), String(matched) + " bell events shared this minute; one pulse used");
+    const String reason = "schedule " + minuteText(event.minuteOfDay);
+    startBell(event.durationSeconds, reason.c_str());
+    return;
   }
 }
 
@@ -205,45 +150,42 @@ static String statusJson() {
   doc["firmware"] = FIRMWARE_VERSION;
   doc["schema"] = SETTINGS_SCHEMA_VERSION;
   doc["ssid"] = AP_SSID;
-  doc["ip"] = WiFi.softAPIP().toString();
-  doc["clients"] = WiFi.softAPgetStationNum();
-  doc["apStarted"] = apStarted;
+  doc["ip"] = apReady ? WiFi.softAPIP().toString() : "AP unavailable";
+  doc["clients"] = apReady ? WiFi.softAPgetStationNum() : 0;
   doc["uptimeSec"] = millis() / 1000UL;
-
-  doc["rtcDetected"] = rtcDetected;
+  doc["apReady"] = apReady;
+  doc["rtcReady"] = rtcReady;
   doc["rtcValid"] = rtcValid;
-  doc["relayOn"] = relayOn;
   doc["automationEnabled"] = settings.automationEnabled;
+  doc["bellRinging"] = bellRinging;
 
-  if (rtcValid) {
-    const DateTime now = rtc.now();
-    doc["time"] = twoDigits(now.hour()) + ":" +
-                  twoDigits(now.minute()) + ":" +
-                  twoDigits(now.second());
-    doc["date"] = twoDigits(now.day()) + "/" +
-                  twoDigits(now.month()) + "/" +
-                  String(now.year());
-    doc["dayOfWeek"] = now.dayOfTheWeek();
-    doc["minuteOfDay"] = now.hour() * 60U + now.minute();
+  if (rtcReady) {
     doc["temperature"] = rtc.getTemperature();
   } else {
-    doc["time"] = "--:--:--";
-    doc["date"] = rtcDetected ? "RTC time must be synchronized" : "DS3231 not detected";
-    doc["dayOfWeek"] = 0;
-    doc["minuteOfDay"] = 0;
     doc["temperature"] = 0;
   }
 
-  JsonArray events = doc["events"].to<JsonArray>();
+  if (rtcValid) {
+    const DateTime now = rtc.now();
+    doc["time"] = twoDigits(now.hour()) + ":" + twoDigits(now.minute()) + ":" + twoDigits(now.second());
+    doc["date"] = twoDigits(now.day()) + "/" + twoDigits(now.month()) + "/" + String(now.year());
+    doc["dayOfWeek"] = now.dayOfTheWeek();
+  } else {
+    doc["time"] = "--:--:--";
+    doc["date"] = rtcReady ? "RTC needs synchronization" : "DS3231 unavailable";
+    doc["dayOfWeek"] = 0;
+  }
+
+  JsonArray rows = doc["bellEvents"].to<JsonArray>();
   for (uint8_t i = 0; i < MAX_BELL_EVENTS; ++i) {
     const BellEvent& event = settings.events[i];
-    JsonObject row = events.add<JsonObject>();
+    JsonObject row = rows.add<JsonObject>();
     row["slot"] = i;
     row["enabled"] = event.enabled;
     row["daysMask"] = event.daysMask;
     row["minuteOfDay"] = event.minuteOfDay;
     row["time"] = minuteText(event.minuteOfDay);
-    row["durationSec"] = event.durationSec;
+    row["durationSeconds"] = event.durationSeconds;
   }
 
   String out;
@@ -251,7 +193,7 @@ static String statusJson() {
   return out;
 }
 
-static String eventsJson() {
+static String historyJson() {
   JsonDocument doc;
   JsonArray rows = doc["events"].to<JsonArray>();
 
@@ -273,13 +215,7 @@ static bool readJson(JsonDocument& doc) {
     return false;
   }
 
-  const String body = server.arg("plain");
-  if (body.length() > 2048) {
-    server.send(413, "application/json", "{\"error\":\"body_too_large\"}");
-    return false;
-  }
-
-  const DeserializationError error = deserializeJson(doc, body);
+  const DeserializationError error = deserializeJson(doc, server.arg("plain"));
   if (error) {
     server.send(400, "application/json", "{\"error\":\"invalid_json\"}");
     return false;
@@ -292,26 +228,45 @@ static void sendOk() {
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static bool hasScheduleConflict(uint8_t editingSlot, uint16_t minuteOfDay, uint8_t daysMask, bool enabled) {
+  if (!enabled) return false;
+
+  for (uint8_t i = 0; i < MAX_BELL_EVENTS; ++i) {
+    if (i == editingSlot) continue;
+
+    const BellEvent& other = settings.events[i];
+    if (!other.enabled) continue;
+
+    if (other.minuteOfDay == minuteOfDay && (other.daysMask & daysMask) != 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static void setupApi() {
   server.on("/api/status", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "no-store");
     server.send(200, "application/json", statusJson());
   });
 
-  server.on("/api/events", HTTP_GET, []() {
-    server.send(200, "application/json", eventsJson());
+  server.on("/api/history", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", historyJson());
   });
 
   server.on("/api/ring", HTTP_POST, []() {
     JsonDocument doc;
     if (!readJson(doc)) return;
 
-    int duration = doc["durationSec"] | DEFAULT_BELL_DURATION_SECONDS;
+    const int duration = doc["durationSeconds"] | DEFAULT_BELL_DURATION_SECONDS;
     if (duration < 1 || duration > MAX_BELL_DURATION_SECONDS) {
       server.send(400, "application/json", "{\"error\":\"invalid_duration\"}");
       return;
     }
 
-    startBellPulse((uint8_t)duration, "manual web control");
+    startBell(static_cast<uint8_t>(duration), "manual web");
     sendOk();
   });
 
@@ -320,52 +275,66 @@ static void setupApi() {
     if (!readJson(doc)) return;
 
     if (!doc["enabled"].is<bool>()) {
-      server.send(400, "application/json", "{\"error\":\"invalid_request\"}");
+      server.send(400, "application/json", "{\"error\":\"missing_enabled\"}");
       return;
     }
 
-    settings.automationEnabled = doc["enabled"].as<bool>();
+    const bool enabled = doc["enabled"].as<bool>();
+    settings.automationEnabled = enabled;
+
     if (!Storage::save(settings)) {
-      server.send(500, "application/json", "{\"error\":\"save_failed\"}");
+      server.send(500, "application/json", "{\"error\":\"storage_failed\"}");
       return;
     }
 
-    resetSchedulerBaseline();
-    eventLog.add(timestampNow(), settings.automationEnabled ? "Automatic schedule enabled" : "Automatic schedule disabled");
+    if (enabled) {
+      // Do not unexpectedly ring an event in the current minute when automation is resumed.
+      markCurrentMinuteTriggered();
+    }
+
+    eventLog.add(timestampNow(), enabled ? "Automatic schedule enabled" : "Automatic schedule paused");
     sendOk();
   });
 
-  server.on("/api/event", HTTP_POST, []() {
+  server.on("/api/bell-event", HTTP_POST, []() {
     JsonDocument doc;
     if (!readJson(doc)) return;
 
     const int slot = doc["slot"] | -1;
     const int minuteOfDay = doc["minuteOfDay"] | -1;
     const int daysMask = doc["daysMask"] | -1;
-    const int durationSec = doc["durationSec"] | -1;
+    const int duration = doc["durationSeconds"] | -1;
+    const bool enabled = doc["enabled"] | false;
 
     if (slot < 0 || slot >= MAX_BELL_EVENTS ||
         minuteOfDay < 0 || minuteOfDay >= 1440 ||
         daysMask < 0 || daysMask > 127 ||
-        durationSec < 1 || durationSec > MAX_BELL_DURATION_SECONDS ||
-        !doc["enabled"].is<bool>()) {
-      server.send(400, "application/json", "{\"error\":\"invalid_event\"}");
+        duration < 1 || duration > MAX_BELL_DURATION_SECONDS) {
+      server.send(400, "application/json", "{\"error\":\"invalid_bell_event\"}");
+      return;
+    }
+
+    if (hasScheduleConflict(
+          static_cast<uint8_t>(slot),
+          static_cast<uint16_t>(minuteOfDay),
+          static_cast<uint8_t>(daysMask),
+          enabled)) {
+      server.send(409, "application/json", "{\"error\":\"duplicate_time_for_selected_days\"}");
       return;
     }
 
     BellEvent& event = settings.events[slot];
-    event.enabled = doc["enabled"].as<bool>();
-    event.daysMask = (uint8_t)daysMask;
-    event.minuteOfDay = (uint16_t)minuteOfDay;
-    event.durationSec = (uint8_t)durationSec;
+    event.enabled = enabled;
+    event.minuteOfDay = static_cast<uint16_t>(minuteOfDay);
+    event.daysMask = static_cast<uint8_t>(daysMask);
+    event.durationSeconds = static_cast<uint8_t>(duration);
 
     if (!Storage::save(settings)) {
-      server.send(500, "application/json", "{\"error\":\"save_failed\"}");
+      server.send(500, "application/json", "{\"error\":\"storage_failed\"}");
       return;
     }
 
-    resetSchedulerBaseline();
-    eventLog.add(timestampNow(), "Bell event " + String(slot + 1) + " updated");
+    eventLog.add(timestampNow(), "Bell event " + String(slot + 1) + " updated to " + minuteText(event.minuteOfDay));
     sendOk();
   });
 
@@ -380,16 +349,29 @@ static void setupApi() {
     const int minute = doc["minute"] | -1;
     const int second = doc["second"] | -1;
 
-    if (!rtcDetected ||
-        !validDateTimeFields(year, month, day, hour, minute, second)) {
+    const uint8_t maxDay =
+        (year >= 2024 && year <= 2099 && month >= 1 && month <= 12)
+          ? daysInMonth(static_cast<uint16_t>(year), static_cast<uint8_t>(month))
+          : 0;
+
+    if (!rtcReady ||
+        year < 2024 || year > 2099 ||
+        month < 1 || month > 12 ||
+        day < 1 || day > maxDay ||
+        hour < 0 || hour > 23 ||
+        minute < 0 || minute > 59 ||
+        second < 0 || second > 59) {
       server.send(400, "application/json", "{\"error\":\"invalid_time\"}");
       return;
     }
 
     rtc.adjust(DateTime(year, month, day, hour, minute, second));
     rtcValid = true;
-    resetSchedulerBaseline();
-    eventLog.add(timestampNow(), "RTC synchronized from phone");
+
+    // Synchronizing the clock must not immediately fire an event in this minute.
+    markCurrentMinuteTriggered();
+
+    eventLog.add(timestampNow(), "RTC synchronized from connected device");
     sendOk();
   });
 
@@ -404,10 +386,15 @@ static void setupApi() {
     }
 
     stopBell("factory reset");
+    writeRelay(false);
+
     Storage::factoryReset(settings);
-    resetSchedulerBaseline();
     eventLog.clear();
-    eventLog.add(timestampNow(), "Factory timetable restored");
+
+    // Avoid a surprise bell if reset is performed during a default event minute.
+    markCurrentMinuteTriggered();
+
+    eventLog.add(timestampNow(), "Factory defaults restored");
     sendOk();
   });
 }
@@ -419,6 +406,7 @@ static void redirectToDashboard() {
 
 static void setupWeb() {
   server.on("/", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "no-store");
     server.send_P(200, "text/html", INDEX_HTML);
   });
 
@@ -430,7 +418,14 @@ static void setupWeb() {
   server.on("/library/test/success.html", HTTP_ANY, redirectToDashboard);
   server.on("/ncsi.txt", HTTP_ANY, redirectToDashboard);
   server.on("/connecttest.txt", HTTP_ANY, redirectToDashboard);
-  server.onNotFound(redirectToDashboard);
+
+  server.onNotFound([]() {
+    if (server.uri().startsWith("/api/")) {
+      server.send(404, "application/json", "{\"error\":\"not_found\"}");
+      return;
+    }
+    redirectToDashboard();
+  });
 
   server.begin();
 }
@@ -443,57 +438,43 @@ static void setupAccessPoint() {
   const IPAddress gateway(192, 168, 4, 1);
   const IPAddress subnet(255, 255, 255, 0);
 
-  WiFi.softAPConfig(ip, gateway, subnet);
-  apStarted = WiFi.softAP(
-    AP_SSID,
-    AP_PASSWORD,
-    AP_CHANNEL,
-    false,
-    AP_MAX_CLIENTS
-  );
+  const bool configured = WiFi.softAPConfig(ip, gateway, subnet);
+  const bool started = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, false, AP_MAX_CLIENTS);
+  apReady = configured && started;
 
-  if (apStarted) {
+  if (apReady) {
     dnsServer.start(53, "*", ip);
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(50);
 
-  // Fail-safe startup: establish OFF before enabling the relay GPIO.
+  // Fail-safe boot: preload OFF before making the pin an output.
   const uint8_t offLevel = RELAY_ACTIVE_HIGH ? LOW : HIGH;
   digitalWrite(RELAY_PIN, offLevel);
   pinMode(RELAY_PIN, OUTPUT);
   writeRelay(false);
-  relayOn = false;
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  rtcDetected = rtc.begin();
-
-  if (rtcDetected) {
-    rtcValid = !rtc.lostPower();
-    if (rtcValid) {
-      const DateTime now = rtc.now();
-      rtcValid = now.year() >= 2024 && now.year() <= 2099;
-    }
-  }
+  rtcReady = rtc.begin();
+  rtcValid = rtcReady && !rtc.lostPower();
 
   Storage::begin(settings);
+  Storage::loadLastTrigger(lastTriggerStamp, lastTriggerSlot);
 
   setupAccessPoint();
   setupWeb();
 
-  eventLog.add(rtcValid ? timestampNow() : "boot", "Controller started");
-
-  if (!rtcDetected) {
+  eventLog.add(timestampNow(), "Controller started");
+  if (!rtcReady) {
     eventLog.add("boot", "DS3231 not detected; automatic ringing disabled");
   } else if (!rtcValid) {
-    eventLog.add("boot", "RTC time invalid; synchronize time before automatic ringing");
+    eventLog.add("boot", "RTC lost power; synchronize time before automatic ringing");
   }
 
-  if (!apStarted) {
-    eventLog.add("boot", "Wi-Fi access point failed to start");
+  if (!apReady) {
+    eventLog.add(timestampNow(), "Wi-Fi access point failed to start");
   }
 
   Serial.println();
@@ -504,17 +485,19 @@ void setup() {
   Serial.println(AP_SSID);
   Serial.print("Dashboard: http://");
   Serial.println(WiFi.softAPIP());
-  Serial.print("RTC: ");
-  Serial.println(rtcValid ? "ready" : "not ready");
+  Serial.print("RTC valid: ");
+  Serial.println(rtcValid ? "yes" : "no");
 }
 
 void loop() {
-  if (apStarted) dnsServer.processNextRequest();
+  if (apReady) {
+    dnsServer.processNextRequest();
+  }
+
   server.handleClient();
 
-  refreshRtcHealth();
-  serviceRelayTimeout();
-  serviceSchedule();
+  serviceBellPulse();
+  serviceScheduler();
 
   delay(2);
 }
