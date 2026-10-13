@@ -275,8 +275,10 @@ function renderOverview() {
   $('clients').textContent = state.clients;
   $('temp').textContent = Number(state.temperature || 0).toFixed(1) + '°';
 
-  $('ringBtn').disabled = state.bellRinging;
-  $('ringBtn').textContent = state.bellRinging ? 'Bell ringing…' : 'Ring now · 3 s';
+  $('ringBtn').disabled = false;
+  $('ringBtn').textContent = state.bellRinging ? 'Stop bell' : 'Ring now · 3 s';
+  $('ringBtn').classList.toggle('danger', state.bellRinging);
+  $('ringBtn').classList.toggle('primary', !state.bellRinging);
 
   $('autoBtn').textContent = state.automationEnabled ? 'Pause automatic schedule' : 'Resume automatic schedule';
   $('autoBtn').classList.toggle('danger', state.automationEnabled);
@@ -427,10 +429,14 @@ $('saveEdit').addEventListener('click', async () => {
 
 $('ringBtn').addEventListener('click', async () => {
   try {
-    await post('/api/ring', {durationSeconds:3});
+    if (state && state.bellRinging) {
+      await post('/api/stop', {});
+    } else {
+      await post('/api/ring', {durationSeconds:3});
+    }
     await refresh();
   } catch (error) {
-    alert('Could not ring bell: ' + error.message);
+    alert('Bell control failed: ' + error.message);
   }
 });
 
