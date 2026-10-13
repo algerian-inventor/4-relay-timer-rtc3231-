@@ -3,10 +3,10 @@
 #include "config.h"
 
 struct BellEvent {
-  bool enabled = false;
-  uint8_t daysMask = SCHOOL_DAYS_MASK;
+  bool enabled = true;
+  uint8_t daysMask = 0x1F; // bit0=Sun ... bit4=Thu; Fri/Sat disabled by default
   uint16_t minuteOfDay = 8 * 60;
-  uint8_t durationSec = DEFAULT_BELL_DURATION_SECONDS;
+  uint8_t durationSeconds = DEFAULT_BELL_DURATION_SECONDS;
 };
 
 struct PersistedSettings {
@@ -20,10 +20,6 @@ inline bool validMinuteOfDay(uint16_t value) {
   return value < 1440;
 }
 
-inline bool validBellDuration(uint8_t value) {
-  return value >= 1 && value <= MAX_BELL_DURATION_SECONDS;
-}
-
 inline bool dayEnabled(uint8_t mask, uint8_t dayOfWeek) {
   return dayOfWeek < 7 && (mask & (1U << dayOfWeek));
 }
@@ -31,6 +27,6 @@ inline bool dayEnabled(uint8_t mask, uint8_t dayOfWeek) {
 inline bool eventMatches(const BellEvent& event, uint8_t dayOfWeek, uint16_t minuteOfDay) {
   return event.enabled &&
          validMinuteOfDay(event.minuteOfDay) &&
-         dayEnabled(event.daysMask, dayOfWeek) &&
-         event.minuteOfDay == minuteOfDay;
+         event.minuteOfDay == minuteOfDay &&
+         dayEnabled(event.daysMask, dayOfWeek);
 }
