@@ -30,6 +30,6 @@ static constexpr uint8_t AP_MAX_CLIENTS = 4;
 
 // Product
 static constexpr char DEVICE_NAME[] = "School Bell Controller";
-static constexpr char FIRMWARE_VERSION[] = "1.0.0-alpha.4";
+static constexpr char FIRMWARE_VERSION[] = "1.0.0-alpha.5";
 static constexpr uint32_t SETTINGS_SCHEMA_VERSION = 3;
 static constexpr uint32_t SETTINGS_MAGIC = 0x53424331; // SBC1
