@@ -1,97 +1,95 @@
-# ESP32 Relay Automation Controller — V1
+# ESP32 School Bell Controller — V1
 
-Arduino IDE firmware for a standalone 4-channel automation controller using ESP32 + DS3231.
+Arduino IDE firmware for a standalone school bell timer built around only:
 
-## V1 architecture
-
-The branch is no longer a direct port of the original Arduino timer. It is being rebuilt as a product-style controller with:
-
-- ESP32 SoftAP + captive portal behavior
-- responsive local dashboard
-- four independently named channels
-- AUTO / forced ON / forced OFF modes
-- six schedules per channel
-- weekday masks
-- correct cross-midnight scheduling
+- ESP32
 - DS3231 RTC
-- sync RTC from a connected phone/computer
-- ESP32 Preferences/NVS persistence
-- versioned settings schema
-- runtime event history
-- safe relay-off boot sequence
-- physical LCD/button fallback controls
-- factory reset API/UI
-- no internet requirement
+- one relay module
+- ESP32 Wi-Fi access point
+
+There is no LCD, rotary encoder, button panel or external router requirement.
+
+## How it works
+
+1. The ESP32 boots and immediately puts the relay in its OFF state.
+2. The DS3231 provides the current time.
+3. The ESP32 creates its own Wi-Fi network.
+4. A phone or laptop connects directly to the ESP32.
+5. The local web dashboard is opened at `http://192.168.4.1`.
+6. Schedules are stored in ESP32 non-volatile memory.
+7. The ESP32 continuously compares the RTC time with the stored schedule and controls the relay.
+8. The phone can disconnect; the controller continues operating by itself.
+
+Internet is not required.
+
+## Default access point
+
+- SSID: `SchoolBell-Setup`
+- Password: `schoolbell`
+- Dashboard: `http://192.168.4.1`
+
+Change production credentials in `config.h`.
+
+## Hardware
+
+| Function | ESP32 GPIO |
+|---|---:|
+| DS3231 SDA | 21 |
+| DS3231 SCL | 22 |
+| Relay IN | 25 |
+
+The DS3231 backup battery keeps time when the ESP32 loses power.
 
 ## Arduino IDE dependencies
 
 Install:
 
 - **RTClib** by Adafruit
-- **LiquidCrystal I2C**
 - **ArduinoJson** by Benoit Blanchon
 
 Install Espressif ESP32 board support from Boards Manager.
 
-## Default access point
+No LCD library is required.
 
-- SSID: `Relay-Control`
-- Password: `relay1234`
-- Address: `http://192.168.4.1`
+## Relay logic
 
-Change production credentials in `config.h`.
-
-## GPIO map
-
-| Function | GPIO |
-|---|---:|
-| SDA | 21 |
-| SCL | 22 |
-| Relay 1 | 25 |
-| Relay 2 | 26 |
-| Relay 3 | 27 |
-| Relay 4 | 33 |
-| Clock / AUTO | 13 |
-| Up / force ON | 14 |
-| Down / force OFF | 16 |
-| Timer / next channel | 17 |
-| Back / AUTO | 18 |
-| Buzzer | 19 |
-
-The LCD and DS3231 share the I2C bus.
-
-## Physical controls
-
-The LCD always shows the currently selected channel.
-
-- **Timer**: select next channel
-- **Up**: force selected channel ON
-- **Down**: force selected channel OFF
-- **Clock**: return selected channel to AUTO
-- **Back**: return selected channel to AUTO
-
-## Safety
-
-The firmware now defaults to the common **active-LOW relay-module** convention:
+The firmware defaults to the common active-LOW relay-module convention:
 
 ```cpp
 static constexpr bool RELAY_ACTIVE_HIGH = false;
 ```
 
-At boot, the OFF logic level is written **before** each relay GPIO is configured as an output. This reduces startup/reset glitches.
+For active-LOW modules:
 
-For a fail-safe product, firmware is only one layer. The hardware should also guarantee:
+- GPIO HIGH = relay OFF
+- GPIO LOW = relay ON
 
-- use **COM + NO** for the automatic bell contact so an unpowered relay opens the circuit;
-- add an external bias resistor on each relay input so the input cannot float when the ESP32 is unpowered;
-- for active-LOW modules, bias the input to the module's verified OFF level;
-- keep the manual bell path independent of the ESP32 so a controller failure does not remove manual operation;
-- use an appropriately rated isolated relay/contactor stage for the real bell load.
+Verify the exact module before connecting the real bell.
 
-Important: some relay modules remain powered from a separate 5 V rail while the ESP32 is off. In that condition, a floating or back-powered IN pin can energize the relay. Verify the exact module before installation.
+## Fail-safe wiring
 
-Test with LEDs or another low-voltage load first. Do not connect mains voltage until relay polarity, isolation, wiring and enclosure safety are verified.
+For the automatic bell output, use the relay's **COM + NO** contacts so an unpowered relay opens the automatic bell circuit.
+
+The existing manual bell control should remain electrically independent of the ESP32. The automatic relay contact can be wired as an additional control path so the school can still ring the bell manually if the controller is disconnected or fails.
+
+A production installation must also prevent the relay input from floating when the ESP32 is unpowered. Use the correct external bias resistor for the specific relay module and verify the module's behavior with the ESP32 powered off.
+
+Do not use a prototype relay board to switch a mains bell directly unless its ratings, isolation, wiring, enclosure and protection are appropriate. Use an isolated relay/contactor stage where required.
+
+## Current software
+
+The local dashboard currently provides:
+
+- RTC time and date
+- relay state
+- AUTO / ON / OFF control
+- weekday schedules
+- RTC synchronization from the connected phone/computer
+- local event history
+- factory reset
+- captive-portal style redirect
+- persistent settings in ESP32 Preferences/NVS
 
 ## Status
 
-This branch is an active V1 refactor. The architecture and UI are substantially upgraded, but hardware compilation/testing is still required on the target ESP32 board before calling it production-ready.
+This is the minimal V1 hardware architecture for the school bell product. Hardware testing on the exact ESP32, DS3231 and relay module is still required before installation.
