@@ -81,7 +81,7 @@ The firmware is designed so the automatic controller fails toward **bell OFF**:
 - the common active-LOW relay convention is the default;
 - automatic events are pulses, never permanent FORCE-ON states;
 - pulse timing is non-blocking, so the web server and scheduler remain responsive;
-- the dashboard can stop a currently active pulse;
+- the dashboard can stop a currently active pulse, and Stop always forces the physical relay GPIO OFF;
 - automatic scheduling is disabled when the DS3231 is missing or reports lost power;
 - time must be synchronized again after RTC power loss;
 - automatic events only start during the first few seconds of their scheduled minute, preventing a reboot late in the minute from causing a delayed bell;
@@ -89,6 +89,8 @@ The firmware is designed so the automatic controller fails toward **bell OFF**:
 - editing a schedule, synchronizing the RTC, restoring defaults or resuming automation suppresses ringing in the current minute;
 - duplicate enabled events at the same time on overlapping weekdays are rejected;
 - invalid dates, times and pulse durations are rejected;
+- oversized JSON API bodies are rejected before parsing;
+- RTC year validity is checked again at boot before automation is trusted;
 - the I2C bus uses a timeout so a wiring problem is less likely to stall the controller indefinitely;
 - Wi-Fi AP status and RTC validity are exposed in the dashboard.
 
@@ -138,6 +140,6 @@ The local dashboard provides:
 
 ## Status
 
-Firmware: `1.0.0-alpha.4`
+Firmware: `1.0.0-alpha.5`
 
 This branch is intended for hardware validation before production use. Test first with an LED or safe low-voltage load, then verify the exact relay module and DS3231 behavior before connecting a real school bell.
