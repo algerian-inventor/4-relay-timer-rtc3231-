@@ -383,9 +383,12 @@ void setup() {
   Serial.begin(115200);
   delay(100);
 
+  // Establish the OFF level before enabling each GPIO as an output.
+  // This minimizes relay glitches during ESP32 startup/reset.
   for (uint8_t i = 0; i < CHANNEL_COUNT; ++i) {
+    const uint8_t offLevel = RELAY_ACTIVE_HIGH ? LOW : HIGH;
+    digitalWrite(RELAY_PINS[i], offLevel);
     pinMode(RELAY_PINS[i], OUTPUT);
-    writeRelayPin(i, false); // Safe boot: all channels off before loading configuration.
   }
 
   pinMode(BUZZER_PIN, OUTPUT);
