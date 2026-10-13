@@ -1,17 +1,17 @@
 # ESP32 School Bell Controller — V1
 
-Standalone school bell controller built around only:
+Standalone Arduino IDE firmware for a school bell controller built around only:
 
 - ESP32
 - DS3231 RTC
 - one relay module
 - ESP32 Wi-Fi access point
 
-No LCD, rotary encoder, physical menu, external router or internet connection is required.
+No LCD, rotary encoder, button panel, router or internet connection is required.
 
 ## Default timetable
 
-Factory defaults are enabled Sunday through Thursday and ring the relay for **3 seconds** at:
+The controller ships with these 12 enabled bell events:
 
 | # | Time |
 |---:|:---|
@@ -28,19 +28,20 @@ Factory defaults are enabled Sunday through Thursday and ring the relay for **3 
 | 11 | 15:00 |
 | 12 | 16:00 |
 
-There are 16 event slots total, so four additional bells can be added from the web dashboard.
+Defaults are enabled **Sunday through Thursday** and each event rings for **3 seconds**. Every time, weekday selection, enabled state and pulse duration can be edited from the web dashboard.
+
+Factory reset restores this timetable.
 
 ## How it works
 
-1. The ESP32 boots with the relay forced OFF.
-2. The DS3231 provides the time.
+1. The ESP32 powers up with the relay forced to OFF.
+2. The DS3231 supplies the date and time.
 3. The ESP32 creates the Wi-Fi network `SchoolBell-Setup`.
-4. A phone or laptop connects directly to the ESP32.
+4. A phone or computer connects directly to the ESP32.
 5. The dashboard is opened at `http://192.168.4.1`.
-6. Bell events are stored in ESP32 Preferences/NVS.
-7. At a scheduled minute the relay receives one short pulse.
-8. The relay is released by a non-blocking timeout.
-9. The phone can disconnect; the controller continues operating by itself.
+6. Bell events are stored in ESP32 non-volatile Preferences/NVS memory.
+7. At a matching event time, the ESP32 produces a short non-blocking relay pulse.
+8. The phone can disconnect and the schedule continues autonomously.
 
 Internet is not required.
 
@@ -60,7 +61,7 @@ Change production credentials in `config.h`.
 | DS3231 SCL | 22 |
 | Relay IN | 25 |
 
-The DS3231 backup battery keeps its clock running when the ESP32 supply is removed.
+The DS3231 backup battery maintains time while the ESP32 is unpowered.
 
 ## Arduino IDE dependencies
 
@@ -72,79 +73,71 @@ Install:
 
 No LCD library is required.
 
-## Reliability behavior
+## Reliability and safety behavior
 
-The scheduler was changed from ON/OFF time intervals to one-shot **bell events**.
+The firmware is designed so the automatic controller fails toward **bell OFF**:
 
-Important protections in the firmware:
+- relay OFF level is written before GPIO 25 becomes an output;
+- the common active-LOW relay convention is the default;
+- automatic events are pulses, never permanent FORCE-ON states;
+- pulse timing is non-blocking, so the web server and scheduler remain responsive;
+- the dashboard can stop a currently active pulse;
+- automatic scheduling is disabled when the DS3231 is missing or reports lost power;
+- time must be synchronized again after RTC power loss;
+- automatic events only start during the first few seconds of their scheduled minute, preventing a reboot late in the minute from causing a delayed bell;
+- the last automatic event minute is stored in NVS to reduce duplicate ringing after a reset;
+- editing a schedule, synchronizing the RTC, restoring defaults or resuming automation suppresses ringing in the current minute;
+- duplicate enabled events at the same time on overlapping weekdays are rejected;
+- invalid dates, times and pulse durations are rejected;
+- the I2C bus uses a timeout so a wiring problem is less likely to stall the controller indefinitely;
+- Wi-Fi AP status and RTC validity are exposed in the dashboard.
 
-- relay OFF level is established before the GPIO becomes an output;
-- default active-LOW relay logic for common relay modules;
-- scheduled ringing is blocked when the DS3231 is missing or reports lost power;
-- invalid RTC time must be synchronized before automation runs;
-- after boot or a clock change, the current minute is only observed, not replayed, reducing accidental duplicate bells after a power interruption;
-- each scheduled minute can trigger only once during normal runtime;
-- relay pulses use a non-blocking deadline rather than `delay()`;
-- pulse duration is validated and limited to 1–15 seconds;
-- malformed or oversized API requests are rejected;
-- calendar dates are validated before writing to the RTC;
-- schedule edits are range-checked before being saved;
-- automation can be disabled without disabling manual web ringing;
-- factory reset first releases the relay and restores the original timetable;
-- settings schema is versioned so incompatible old settings are replaced safely.
-
-These protections reduce common software failure modes, but they do **not** replace hardware validation.
+These protections reduce software failure modes, but they do **not** replace hardware fail-safe design or real hardware testing.
 
 ## Relay logic
 
-The firmware defaults to a common active-LOW relay module:
+The firmware defaults to:
 
 ```cpp
 static constexpr bool RELAY_ACTIVE_HIGH = false;
 ```
 
-For this configuration:
+For a typical active-LOW module:
 
 - GPIO HIGH = relay OFF
 - GPIO LOW = relay ON
 
-Verify your exact relay module before connecting the real school bell.
+Verify the exact relay module before installing the controller.
 
-## Fail-safe wiring
+## Fail-safe bell wiring
 
-For the automatic output use the relay's **COM + NO** contacts so an unpowered relay opens the automatic bell circuit.
+Use the relay's **COM + NO** contacts for the automatic bell path so an unpowered relay opens that path.
 
-Keep the existing manual school-bell path independent of the ESP32. The automatic relay contact should be an additional control path, so the original manual control remains available if the controller is unplugged or fails.
+Keep the school's manual bell control independent from the ESP32. The automatic relay contact should act as an additional control path, so a controller fault or removal does not prevent manual operation.
 
-If the relay module remains powered while the ESP32 is off, its IN pin must have the correct external bias so it cannot float into the ON state.
+A production build must also bias the relay input to a known OFF state when the ESP32 is unpowered. The correct pull-up/pull-down arrangement depends on the exact relay module, especially when the module remains powered from a separate 5 V supply.
 
-For mains or high-current bells, use a properly rated isolated relay/contactor stage, protection and enclosure. Do not assume a small development relay board is suitable for the final load.
+Do not switch a mains bell directly with a prototype relay module unless the module, isolation, PCB clearances, enclosure, fusing and installation are appropriate for that load. Use an appropriately rated isolated relay/contactor stage where required.
 
 ## Dashboard
 
 The local dashboard provides:
 
-- live RTC time and date
-- next-bell calculation
-- relay state
+- current DS3231 time/date and RTC fault warning
+- next scheduled bell
 - manual **Ring now** pulse
-- enable/disable automation
-- editable bell times
-- selectable weekdays
-- per-event pulse duration
-- add/disable bell events
+- manual **Stop bell**
+- automatic schedule pause/resume
+- all 12 editable bell events
+- weekday selection per event
+- 1–30 second pulse duration per event
 - RTC synchronization from the connected phone/computer
-- local runtime history
-- factory timetable restore
-- captive-portal-style redirect
-- persistent configuration
-
-## RTC safety behavior
-
-If the DS3231 is absent or reports that it lost power, automatic ringing is disabled. Connect to the dashboard and use **Sync RTC from this device** before relying on the automatic timetable.
+- runtime history
+- AP/client status
+- factory reset to the default timetable
 
 ## Status
 
-Firmware version: `1.0.0-beta.1`
+Firmware: `1.0.0-alpha.4`
 
-This branch is intended for hardware testing. It has not yet been validated on the exact final relay module, bell load, power supply and enclosure, so installation testing is still required before treating it as production-ready.
+This branch is intended for hardware validation before production use. Test first with an LED or safe low-voltage load, then verify the exact relay module and DS3231 behavior before connecting a real school bell.
