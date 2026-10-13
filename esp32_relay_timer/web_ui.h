@@ -10,157 +10,340 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 <meta name="theme-color" content="#0b0e11">
 <title>School Bell Controller</title>
 <style>
-:root{
-  --bg:#0a0d10;--panel:#11161b;--panel2:#171d23;--line:#273039;
-  --text:#f5f7f8;--muted:#8f9aa5;--green:#5ad37a;--amber:#e7b54f;
-  --red:#ef6b6b;--blue:#79a7ff;--radius:18px;
-}
-*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 20% -10%,#182129 0,transparent 35%),var(--bg);min-height:100vh}
-button,input{font:inherit}.app{max-width:1180px;margin:auto;padding:18px 16px 48px}
-.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:8px 2px 20px}.identity h1{font-size:1.05rem;margin:0;font-weight:760;letter-spacing:.02em}.identity p{margin:4px 0 0;color:var(--muted);font-size:.78rem}.online{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.78rem}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(90,211,122,.6)}
-.nav{display:flex;gap:6px;padding:5px;background:#0e1216;border:1px solid var(--line);border-radius:14px;overflow:auto;margin-bottom:16px}.nav button{border:0;background:transparent;color:var(--muted);font-weight:700;padding:10px 14px;border-radius:10px;white-space:nowrap;cursor:pointer}.nav button.active{background:#20272e;color:#fff}
-.page{display:none}.page.active{display:block}.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-bottom:14px}.panel{background:rgba(17,22,27,.94);border:1px solid var(--line);border-radius:var(--radius);padding:18px}.clock{font-size:2.5rem;letter-spacing:-.045em;font-weight:780}.date{margin-top:4px;color:var(--muted)}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.metric b{display:block;font-size:1.1rem}.metric span{color:var(--muted);font-size:.72rem}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.channel{background:rgba(17,22,27,.95);border:1px solid var(--line);border-radius:var(--radius);padding:18px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.eyebrow{color:var(--muted);font-size:.68rem;font-weight:800;letter-spacing:.1em}.channel h3{margin:4px 0 0;font-size:1.02rem}.state{font-size:.72rem;font-weight:850;padding:7px 10px;border-radius:999px;background:#222931;color:var(--muted)}.state.on{background:rgba(90,211,122,.13);color:var(--green)}.mode{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:15px;padding:4px;background:#0d1114;border:1px solid var(--line);border-radius:12px}.mode button{border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:750;padding:9px;cursor:pointer}.mode button.active{background:#252d34;color:#fff}.next{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}.next span{display:block;color:var(--muted);font-size:.7rem;margin-bottom:4px}.next b{font-size:.92rem}.smallbtn{margin-top:10px;width:100%;border:1px solid var(--line);background:#20272e;color:#fff;padding:10px;border-radius:11px;font-weight:700;cursor:pointer}
-.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:4px 0 12px}.section-head h2{margin:0;font-size:1.15rem}.section-head p{margin:4px 0 0;color:var(--muted);font-size:.8rem}
-.schedule-card{margin-bottom:10px;background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px}.schedule-grid{display:grid;grid-template-columns:160px 1fr auto;gap:12px;align-items:center}.times{font-weight:780}.days{display:flex;gap:5px;flex-wrap:wrap}.day{font-size:.66rem;padding:5px 7px;border-radius:7px;background:#20262c;color:var(--muted)}.day.on{color:#fff;background:#303943}.tag{font-size:.68rem;padding:6px 8px;border-radius:999px;background:#222931;color:var(--muted)}.tag.on{color:var(--green);background:rgba(90,211,122,.12)}
-.events{display:flex;flex-direction:column;gap:8px}.event{display:grid;grid-template-columns:90px 1fr;gap:12px;border:1px solid var(--line);background:var(--panel);border-radius:13px;padding:12px}.event time{color:var(--muted);font-size:.75rem}
-.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.setting h3{margin:0 0 5px;font-size:.95rem}.setting p{margin:0 0 12px;color:var(--muted);font-size:.78rem}.danger{border-color:rgba(239,107,107,.35)}.danger button{background:rgba(239,107,107,.12);color:#ff9b9b}
-dialog{width:min(92vw,520px);border:1px solid var(--line);border-radius:18px;background:#12171c;color:#fff;padding:18px}dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}dialog h2{margin:0 0 14px;font-size:1.05rem}.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:.75rem}input[type=text],input[type=time]{width:100%;background:#0d1114;color:#fff;border:1px solid var(--line);border-radius:11px;padding:11px}.check{display:flex;flex-direction:row;align-items:center;gap:8px;color:#fff;margin:14px 0}.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:12px 0}.week button{border:1px solid var(--line);background:#171d23;color:var(--muted);border-radius:9px;padding:8px 3px;font-size:.68rem;cursor:pointer}.week button.on{background:#303943;color:#fff}.actions{display:flex;gap:8px;margin-top:14px}.actions button{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px;background:#20272e;color:#fff;font-weight:750;cursor:pointer}.actions .primary{background:#fff;color:#111;border-color:#fff}.muted{color:var(--muted)}.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
-@media(max-width:760px){.hero,.grid,.settings-grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,1fr)}.schedule-grid{grid-template-columns:1fr}.clock{font-size:2.1rem}.event{grid-template-columns:72px 1fr}.app{padding:12px 12px 36px}}
+:root{--bg:#0a0d10;--panel:#11161b;--panel2:#171d23;--line:#29323a;--text:#f4f7f8;--muted:#95a0aa;--green:#5ad37a;--amber:#e8b856;--red:#ef7373;--radius:18px}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit}.app{max-width:980px;margin:auto;padding:16px 14px 42px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.top h1{font-size:1.05rem;margin:0}.top p{font-size:.78rem;color:var(--muted);margin:4px 0 0}.net{font-size:.76rem;color:var(--muted)}
+.nav{display:flex;gap:6px;overflow:auto;border:1px solid var(--line);padding:5px;border-radius:14px;margin-bottom:14px}.nav button{border:0;background:transparent;color:var(--muted);padding:10px 14px;border-radius:10px;font-weight:750;white-space:nowrap}.nav button.active{background:#20272d;color:#fff}
+.page{display:none}.page.active{display:block}.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}.hero{display:grid;grid-template-columns:1fr 1fr;gap:12px}.clock{font-size:2.6rem;font-weight:800;letter-spacing:-.04em}.muted{color:var(--muted)}.status{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px}.metric b{display:block;font-size:1rem}.metric span{font-size:.7rem;color:var(--muted)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.btn{border:1px solid var(--line);border-radius:12px;padding:12px;background:#20272e;color:#fff;font-weight:800;min-height:44px}.btn.primary{background:#f4f7f8;color:#111}.btn.danger{color:#ffaaaa;background:rgba(239,115,115,.08)}.btn.warn{color:#ffd98b}.btn:disabled{opacity:.45}
+.notice{margin-top:12px;border:1px solid rgba(232,184,86,.35);background:rgba(232,184,86,.08);color:#f3d38f;padding:12px;border-radius:12px;font-size:.82rem}
+.sectionhead{display:flex;justify-content:space-between;align-items:end;gap:10px;margin:4px 0 12px}.sectionhead h2{margin:0;font-size:1.1rem}.sectionhead p{margin:4px 0 0;color:var(--muted);font-size:.78rem}.list{display:flex;flex-direction:column;gap:8px}.event{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}.etime{font-size:1.2rem;font-weight:850}.days{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}.day{font-size:.64rem;padding:4px 6px;border-radius:6px;background:#20262c;color:var(--muted)}.day.on{color:#fff;background:#303941}.pill{font-size:.68rem;color:var(--green);background:rgba(90,211,122,.1);padding:6px 8px;border-radius:999px}.event button{width:auto;margin:0}.empty{padding:24px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.history{display:flex;flex-direction:column;gap:7px}.log{display:grid;grid-template-columns:90px 1fr;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.log time{font-size:.73rem;color:var(--muted)}
+dialog{width:min(92vw,500px);border:1px solid var(--line);border-radius:18px;background:#12171c;color:#fff;padding:18px}dialog::backdrop{background:rgba(0,0,0,.72)}dialog h2{margin:0 0 14px;font-size:1.05rem}label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;color:var(--muted);margin-bottom:10px}input[type=time],input[type=number]{width:100%;background:#0c1013;color:#fff;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:16px}.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:12px 0}.week button{border:1px solid var(--line);background:#171d23;color:var(--muted);border-radius:9px;padding:9px 3px}.week button.on{background:#303941;color:#fff}.check{display:flex;flex-direction:row;align-items:center;color:#fff;gap:8px}.dialogactions{display:flex;gap:8px;margin-top:14px}.dialogactions button{flex:1}
+@media(max-width:720px){.hero,.grid2{grid-template-columns:1fr}.status{grid-template-columns:repeat(3,1fr)}.event{grid-template-columns:76px 1fr}.event>button{grid-column:1/-1;width:100%}.clock{font-size:2.2rem}}
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="identity"><h1>School Bell Controller</h1><p>ESP32 • Local school bell system</p></div>
-    <div class="online"><span class="dot"></span><span id="net">Connected</span></div>
+  <header class="top">
+    <div><h1>School Bell Controller</h1><p>ESP32 + DS3231 · standalone access point</p></div>
+    <div class="net" id="net">Connecting…</div>
   </header>
 
   <nav class="nav">
-    <button class="active" data-page="overview">Overview</button>
-    <button data-page="schedules">Schedules</button>
+    <button class="active" data-page="home">Home</button>
+    <button data-page="schedule">Schedule</button>
     <button data-page="history">History</button>
     <button data-page="device">Device</button>
   </nav>
 
-  <section id="overview" class="page active">
+  <section id="home" class="page active">
     <div class="hero">
-      <div class="panel"><div class="clock" id="clock">--:--:--</div><div class="date" id="date">Loading RTC…</div></div>
-      <div class="metrics">
-        <div class="metric"><b id="temp">--.-°</b><span>RTC temperature</span></div>
-        <div class="metric"><b id="clients">0</b><span>Connected clients</span></div>
-        <div class="metric"><b id="uptime">0m</b><span>Uptime</span></div>
+      <div class="panel">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="muted" id="date">Loading RTC…</div>
+        <div id="rtcNotice" class="notice" style="display:none">RTC time is not valid. Synchronize it before relying on automatic bells.</div>
+      </div>
+      <div class="panel">
+        <div class="muted" style="font-size:.72rem">NEXT BELL</div>
+        <div id="nextBell" style="font-size:1.45rem;font-weight:850;margin-top:5px">--</div>
+        <div id="nextBellMeta" class="muted" style="margin-top:5px;font-size:.8rem">Waiting for schedule</div>
+        <div class="status">
+          <div class="metric"><b id="relayState">OFF</b><span>Relay</span></div>
+          <div class="metric"><b id="autoState">ON</b><span>Automation</span></div>
+          <div class="metric"><b id="clients">0</b><span>Clients</span></div>
+        </div>
       </div>
     </div>
-    <div class="grid" id="channels"></div>
+
+    <div class="actions">
+      <button class="btn primary" id="ringBtn">Ring now · 3s</button>
+      <button class="btn" id="autoBtn">Disable automation</button>
+    </div>
   </section>
 
-  <section id="schedules" class="page">
-    <div class="section-head"><div><h2>Schedules</h2><p>Configure the bell schedule locally, with weekday control.</p></div></div>
-    <div id="scheduleList"></div>
+  <section id="schedule" class="page">
+    <div class="sectionhead">
+      <div><h2>Bell schedule</h2><p>Each entry is a short one-shot relay pulse.</p></div>
+      <button class="btn" id="addBtn" style="width:auto">Add bell</button>
+    </div>
+    <div class="list" id="eventList"></div>
   </section>
 
   <section id="history" class="page">
-    <div class="section-head"><div><h2>History</h2><p>Recent runtime events stored in memory.</p></div><button class="smallbtn" style="width:auto;margin:0" onclick="loadEvents()">Refresh</button></div>
-    <div id="events" class="events"></div>
+    <div class="sectionhead">
+      <div><h2>History</h2><p>Recent runtime events.</p></div>
+      <button class="btn" id="refreshHistory" style="width:auto">Refresh</button>
+    </div>
+    <div class="history" id="historyList"></div>
   </section>
 
   <section id="device" class="page">
-    <div class="settings-grid">
-      <div class="panel setting"><h3>RTC synchronization</h3><p>Set the DS3231 from the current time on this phone or computer.</p><button class="smallbtn" onclick="syncTime()">Sync from this device</button></div>
-      <div class="panel setting"><h3>Network</h3><p id="networkInfo">Loading…</p></div>
-      <div class="panel setting"><h3>Firmware</h3><p id="firmwareInfo">Loading…</p></div>
-      <div class="panel setting danger"><h3>Factory reset</h3><p>Restore channel names, schedules and modes to defaults.</p><button class="smallbtn" onclick="factoryReset()">Restore defaults</button></div>
+    <div class="grid2">
+      <div class="panel">
+        <h3 style="margin-top:0">RTC synchronization</h3>
+        <p class="muted">Copy the current date and time from this phone or computer to the DS3231.</p>
+        <button class="btn" id="syncBtn">Sync RTC from this device</button>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Network</h3>
+        <p class="muted" id="networkInfo">Loading…</p>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Firmware</h3>
+        <p class="muted" id="firmwareInfo">Loading…</p>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Factory timetable</h3>
+        <p class="muted">Restore the original 12 default bell times and Sunday–Thursday schedule.</p>
+        <button class="btn danger" id="resetBtn">Restore defaults</button>
+      </div>
     </div>
   </section>
 </div>
 
-<dialog id="nameDialog">
-  <h2>Rename output</h2>
-  <label>Channel name<input id="channelName" type="text" maxlength="23"></label>
-  <div class="actions"><button onclick="nameDialog.close()">Cancel</button><button class="primary" onclick="saveName()">Save</button></div>
-</dialog>
-
-<dialog id="scheduleDialog">
-  <h2 id="scheduleTitle">Edit schedule</h2>
-  <div class="form"><label>Start<input id="startTime" type="time"></label><label>End<input id="endTime" type="time"></label></div>
-  <label class="check"><input id="enabled" type="checkbox"> Enabled</label>
+<dialog id="eventDialog">
+  <h2 id="dialogTitle">Edit bell</h2>
+  <label>Bell time<input id="bellTime" type="time"></label>
+  <label>Pulse duration in seconds<input id="durationSec" type="number" min="1" max="15" inputmode="numeric"></label>
+  <label class="check"><input id="eventEnabled" type="checkbox"> Enabled</label>
   <div class="week" id="week"></div>
-  <div class="actions"><button onclick="scheduleDialog.close()">Cancel</button><button class="primary" onclick="saveSchedule()">Save</button></div>
+  <div class="dialogactions">
+    <button class="btn" id="cancelEvent">Cancel</button>
+    <button class="btn danger" id="deleteEvent">Disable</button>
+    <button class="btn primary" id="saveEvent">Save</button>
+  </div>
 </dialog>
 
 <script>
-let state=null, editChannel=0, editSlot=0, editDays=127;
+let state=null;
+let editSlot=-1;
+let editDays=31;
 const dayNames=['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); document.getElementById(b.dataset.page).classList.add('active');
-  if(b.dataset.page==='history') loadEvents();
-});
-
+const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
-const timeText=m=>pad(Math.floor(m/60))+':'+pad(m%60);
 const esc=s=>{const d=document.createElement('div');d.textContent=s;return d.innerHTML};
 
-function render(){
-  if(!state)return;
-  clock.textContent=state.time; date.textContent=state.date+(state.rtcReady?'':' • RTC fault');
-  temp.textContent=Number(state.temperature).toFixed(1)+'°'; clients.textContent=state.clients;
-  uptime.textContent=Math.floor(state.uptimeSec/60)+'m';
-  networkInfo.textContent=state.ssid+' • '+state.ip+' • '+state.clients+' client(s)';
-  firmwareInfo.textContent=state.firmware+' • settings schema '+state.schema;
-
-  channels.innerHTML='';
-  state.channels.forEach((c,i)=>{
-    const activeSchedules=c.schedules.filter(s=>s.enabled).length;
-    const el=document.createElement('article'); el.className='channel';
-    el.innerHTML='<div class="row"><div><div class="eyebrow">BELL OUTPUT+'</div><h3>'+esc(c.name)+'</h3></div><span class="state '+(c.state?'on':'')+'">'+(c.state?'RUNNING':'STOPPED')+'</span></div>'+
-      '<div class="next"><span>AUTOMATION</span><b>'+activeSchedules+' active schedule'+(activeSchedules===1?'':'s')+' • '+c.modeName+'</b></div>'+
-      '<div class="mode">'+modeBtn(i,0,'AUTO',c.mode)+modeBtn(i,1,'ON',c.mode)+modeBtn(i,2,'OFF',c.mode)+'</div>'+
-      '<button class="smallbtn" onclick="renameChannel('+i+')">Rename channel</button>';
-    channels.appendChild(el);
+document.querySelectorAll('.nav button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    btn.classList.add('active');
+    $(btn.dataset.page).classList.add('active');
+    if(btn.dataset.page==='history') loadHistory();
   });
+});
 
-  renderSchedules();
+async function post(url,data){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
-function modeBtn(i,m,label,current){return '<button class="'+(m===current?'active':'')+'" onclick="setMode('+i+','+m+')">'+label+'</button>'}
+function activeEvents(){
+  return state ? state.events.filter(e=>e.enabled) : [];
+}
 
-function renderSchedules(){
-  scheduleList.innerHTML='';
-  state.channels.forEach((c,ci)=>{
-    const wrap=document.createElement('div');
-    wrap.innerHTML='<div class="section-head"><div><h2 style="font-size:1rem">'+esc(c.name)+'</h2><p>Channel '+(ci+1)+'</p></div></div>';
-    c.schedules.forEach((s,si)=>{
-      const row=document.createElement('div');row.className='schedule-card';
-      let days=''; dayNames.forEach((d,di)=>days+='<span class="day '+((s.daysMask&(1<<di))?'on':'')+'">'+d+'</span>');
-      row.innerHTML='<div class="schedule-grid"><div><div class="eyebrow">RULE '+pad(si+1)+'</div><div class="times">'+s.start+' → '+s.end+'</div></div><div class="days">'+days+'</div><div><span class="tag '+(s.enabled?'on':'')+'">'+(s.enabled?'ENABLED':'DISABLED')+'</span><button class="smallbtn" onclick="editSchedule('+ci+','+si+')">Edit</button></div></div>';
-      wrap.appendChild(row);
+function computeNextBell(){
+  if(!state || !state.rtcValid || !state.automationEnabled) return null;
+  let best=null;
+  for(let offset=0;offset<7;offset++){
+    const dow=(state.dayOfWeek+offset)%7;
+    state.events.forEach(e=>{
+      if(!e.enabled || !(e.daysMask&(1<<dow))) return;
+      if(offset===0 && e.minuteOfDay<=state.minuteOfDay) return;
+      const delta=offset*1440 + e.minuteOfDay - state.minuteOfDay;
+      if(best===null || delta<best.delta) best={event:e,offset,delta,dow};
     });
-    scheduleList.appendChild(wrap);
+  }
+  return best;
+}
+
+function render(){
+  if(!state) return;
+
+  $('clock').textContent=state.time;
+  $('date').textContent=state.date;
+  $('rtcNotice').style.display=state.rtcValid?'none':'block';
+  $('relayState').textContent=state.relayOn?'ON':'OFF';
+  $('autoState').textContent=state.automationEnabled?'ON':'OFF';
+  $('clients').textContent=state.clients;
+  $('autoBtn').textContent=state.automationEnabled?'Disable automation':'Enable automation';
+  $('autoBtn').className='btn '+(state.automationEnabled?'warn':'');
+  $('networkInfo').textContent=state.ssid+' · '+state.ip+' · '+state.clients+' client(s)';
+  $('firmwareInfo').textContent=state.firmware+' · schema '+state.schema;
+
+  const next=computeNextBell();
+  if(next){
+    $('nextBell').textContent=next.event.time;
+    $('nextBellMeta').textContent=(next.offset===0?'Today':next.offset===1?'Tomorrow':dayNames[next.dow])+' · '+next.event.durationSec+'s pulse';
+  }else{
+    $('nextBell').textContent='--';
+    $('nextBellMeta').textContent=!state.rtcValid?'RTC not ready':!state.automationEnabled?'Automation disabled':'No upcoming enabled bell';
+  }
+
+  renderEvents();
+}
+
+function renderEvents(){
+  if(!state) return;
+  const rows=activeEvents().slice().sort((a,b)=>a.minuteOfDay-b.minuteOfDay);
+  if(!rows.length){
+    $('eventList').innerHTML='<div class="empty">No enabled bell events.</div>';
+    return;
+  }
+
+  $('eventList').innerHTML=rows.map(e=>{
+    let days='';
+    dayNames.forEach((d,i)=>days+='<span class="day '+((e.daysMask&(1<<i))?'on':'')+'">'+d+'</span>');
+    return '<div class="event">'+
+      '<div class="etime">'+e.time+'</div>'+
+      '<div><div><span class="pill">'+e.durationSec+'s pulse</span></div><div class="days">'+days+'</div></div>'+
+      '<button class="btn" data-edit="'+e.slot+'">Edit</button>'+
+      '</div>';
+  }).join('');
+
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEvent(Number(b.dataset.edit))));
+}
+
+function renderWeek(){
+  $('week').innerHTML='';
+  dayNames.forEach((name,i)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.textContent=name;
+    b.className=(editDays&(1<<i))?'on':'';
+    b.addEventListener('click',()=>{editDays^=(1<<i);renderWeek()});
+    $('week').appendChild(b);
   });
+}
+
+function openEvent(slot){
+  const e=state.events.find(x=>x.slot===slot);
+  if(!e) return;
+  editSlot=slot;
+  editDays=e.daysMask;
+  $('bellTime').value=e.time;
+  $('durationSec').value=e.durationSec;
+  $('eventEnabled').checked=e.enabled;
+  $('dialogTitle').textContent='Edit bell '+pad(slot+1);
+  $('deleteEvent').style.display=e.enabled?'block':'none';
+  renderWeek();
+  $('eventDialog').showModal();
+}
+
+function addEvent(){
+  const free=state.events.find(e=>!e.enabled);
+  if(!free){alert('Maximum of '+state.events.length+' bell events reached.');return}
+  editSlot=free.slot;
+  editDays=31;
+  $('bellTime').value='08:00';
+  $('durationSec').value=3;
+  $('eventEnabled').checked=true;
+  $('dialogTitle').textContent='Add bell';
+  $('deleteEvent').style.display='none';
+  renderWeek();
+  $('eventDialog').showModal();
+}
+
+async function saveEvent(){
+  const parts=$('bellTime').value.split(':');
+  if(parts.length!==2){alert('Choose a valid time.');return}
+  const minuteOfDay=(+parts[0])*60+(+parts[1]);
+  const duration=Number($('durationSec').value);
+  if(!Number.isInteger(duration)||duration<1||duration>15){alert('Duration must be 1 to 15 seconds.');return}
+
+  await post('/api/event',{
+    slot:editSlot,
+    enabled:$('eventEnabled').checked,
+    daysMask:editDays,
+    minuteOfDay,
+    durationSec:duration
+  });
+  $('eventDialog').close();
+  await refresh();
+}
+
+async function disableEvent(){
+  const e=state.events.find(x=>x.slot===editSlot);
+  if(!e) return;
+  await post('/api/event',{
+    slot:e.slot,enabled:false,daysMask:e.daysMask,
+    minuteOfDay:e.minuteOfDay,durationSec:e.durationSec
+  });
+  $('eventDialog').close();
+  await refresh();
 }
 
 async function refresh(){
   try{
-    const r=await fetch('/api/status',{cache:'no-store'}); if(!r.ok)throw 0;
-    state=await r.json(); net.textContent='Connected'; render();
-  }catch(e){net.textContent='Reconnecting';}
+    const r=await fetch('/api/status',{cache:'no-store'});
+    if(!r.ok) throw new Error('status');
+    state=await r.json();
+    $('net').textContent='Connected';
+    render();
+  }catch(e){
+    $('net').textContent='Reconnecting…';
+  }
 }
-async function post(url,data){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text());return r.json()}
-async function setMode(channel,mode){await post('/api/channel/mode',{channel,mode});await refresh()}
-function renameChannel(i){editChannel=i;channelName.value=state.channels[i].name;nameDialog.showModal()}
-async function saveName(){await post('/api/channel/name',{channel:editChannel,name:channelName.value.trim()});nameDialog.close();await refresh()}
-function editSchedule(c,s){editChannel=c;editSlot=s;const x=state.channels[c].schedules[s];editDays=x.daysMask;startTime.value=x.start;endTime.value=x.end;enabled.checked=x.enabled;scheduleTitle.textContent=state.channels[c].name+' • rule '+(s+1);renderWeek();scheduleDialog.showModal()}
-function renderWeek(){week.innerHTML='';dayNames.forEach((d,i)=>{const b=document.createElement('button');b.textContent=d;b.className=(editDays&(1<<i))?'on':'';b.onclick=()=>{editDays^=(1<<i);renderWeek()};week.appendChild(b)})}
-async function saveSchedule(){const a=startTime.value.split(':'),b=endTime.value.split(':');await post('/api/schedule',{channel:editChannel,slot:editSlot,enabled:enabled.checked,daysMask:editDays,startMinute:(+a[0])*60+(+a[1]),endMinute:(+b[0])*60+(+b[1])});scheduleDialog.close();await refresh()}
-async function syncTime(){const d=new Date();await post('/api/time',{year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate(),hour:d.getHours(),minute:d.getMinutes(),second:d.getSeconds()});await refresh();alert('RTC synchronized')}
-async function loadEvents(){try{const r=await fetch('/api/events',{cache:'no-store'}),d=await r.json();events.innerHTML=d.events.length?d.events.map(e=>'<div class="event"><time>'+esc(e.time)+'</time><div>'+esc(e.message)+'</div></div>').join(''):'<div class="empty">No events yet.</div>'}catch(e){events.innerHTML='<div class="empty">Could not load history.</div>'}}
-async function factoryReset(){if(!confirm('Restore all school bell settings to defaults?'))return;await post('/api/factory-reset',{confirm:true});await refresh();alert('Factory defaults restored')}
 
-refresh();setInterval(refresh,1000);
+async function loadHistory(){
+  try{
+    const r=await fetch('/api/events',{cache:'no-store'});
+    const d=await r.json();
+    $('historyList').innerHTML=d.events.length
+      ?d.events.map(e=>'<div class="log"><time>'+esc(e.time)+'</time><div>'+esc(e.message)+'</div></div>').join('')
+      :'<div class="empty">No events yet.</div>';
+  }catch(e){
+    $('historyList').innerHTML='<div class="empty">Could not load history.</div>';
+  }
+}
+
+$('ringBtn').addEventListener('click',async()=>{
+  try{
+    await post('/api/ring',{durationSec:3});
+    await refresh();
+  }catch(e){alert('Could not ring the bell.')}
+});
+
+$('autoBtn').addEventListener('click',async()=>{
+  if(!state) return;
+  try{
+    await post('/api/automation',{enabled:!state.automationEnabled});
+    await refresh();
+  }catch(e){alert('Could not change automation state.')}
+});
+
+$('addBtn').addEventListener('click',addEvent);
+$('cancelEvent').addEventListener('click',()=>$('eventDialog').close());
+$('saveEvent').addEventListener('click',()=>saveEvent().catch(()=>alert('Could not save bell event.')));
+$('deleteEvent').addEventListener('click',()=>disableEvent().catch(()=>alert('Could not disable bell event.')));
+$('refreshHistory').addEventListener('click',loadHistory);
+
+$('syncBtn').addEventListener('click',async()=>{
+  const d=new Date();
+  try{
+    await post('/api/time',{
+      year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate(),
+      hour:d.getHours(),minute:d.getMinutes(),second:d.getSeconds()
+    });
+    await refresh();
+    alert('RTC synchronized.');
+  }catch(e){alert('RTC synchronization failed.')}
+});
+
+$('resetBtn').addEventListener('click',async()=>{
+  if(!confirm('Restore the original default timetable?')) return;
+  try{
+    await post('/api/factory-reset',{confirm:true});
+    await refresh();
+    alert('Default timetable restored.');
+  }catch(e){alert('Factory reset failed.')}
+});
+
+refresh();
+setInterval(refresh,1000);
 </script>
 </body>
 </html>
