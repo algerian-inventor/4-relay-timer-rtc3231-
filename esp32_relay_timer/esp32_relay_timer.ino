@@ -3,26 +3,20 @@
 #include <DNSServer.h>
 #include <Wire.h>
 #include <RTClib.h>
-#include <LiquidCrystal_I2C.h>
 #include <ArduinoJson.h>
 
 #include "config.h"
 #include "model.h"
 #include "storage.h"
 #include "event_log.h"
-#include "button_controller.h"
-#include "display_controller.h"
 #include "web_ui.h"
 
 RTC_DS3231 rtc;
-LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
 WebServer server(80);
 DNSServer dnsServer;
 
 PersistedSettings settings;
 EventLog eventLog;
-ButtonController buttons;
-DisplayController display(lcd);
 
 bool rtcReady = false;
 unsigned long bootMs = 0;
@@ -35,12 +29,6 @@ static String timestampNow() {
   if (!rtcReady) return "RTC unavailable";
   DateTime now = rtc.now();
   return twoDigits(now.hour()) + ":" + twoDigits(now.minute()) + ":" + twoDigits(now.second());
-}
-
-static void beep(uint16_t ms = 45) {
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(ms);
-  digitalWrite(BUZZER_PIN, LOW);
 }
 
 static void writeRelayPin(uint8_t index, bool on) {
@@ -355,29 +343,6 @@ static void setupAccessPoint() {
   dnsServer.start(53, "*", ip);
 }
 
-static void handlePhysicalControls() {
-  const ButtonAction action = buttons.poll();
-  if (action == ButtonAction::NONE) return;
-
-  uint8_t selected = display.selected();
-  RelayChannel& channel = settings.channels[selected];
-
-  if (action == ButtonAction::TIMER) {
-    display.nextChannel();
-    beep();
-    return;
-  }
-
-  if (action == ButtonAction::UP) channel.mode = RelayMode::FORCE_ON;
-  if (action == ButtonAction::DOWN) channel.mode = RelayMode::FORCE_OFF;
-  if (action == ButtonAction::CLOCK || action == ButtonAction::BACK) channel.mode = RelayMode::AUTO;
-
-  Storage::save(settings);
-  eventLog.add(timestampNow(), String(channel.name) + " mode → " + modeName(channel.mode) + " (panel)");
-  updateRelays();
-  beep();
-}
-
 void setup() {
   bootMs = millis();
   Serial.begin(115200);
@@ -391,15 +356,7 @@ void setup() {
     pinMode(RELAY_PINS[i], OUTPUT);
   }
 
-  pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW);
-
-  buttons.begin();
-
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  display.begin();
-  display.showBoot();
-
   rtcReady = rtc.begin();
 
   Storage::begin(settings);
@@ -431,9 +388,7 @@ void loop() {
   dnsServer.processNextRequest();
   server.handleClient();
 
-  handlePhysicalControls();
   updateRelays();
-  display.refresh(rtcReady, rtc, settings.channels);
 
   delay(2);
 }
