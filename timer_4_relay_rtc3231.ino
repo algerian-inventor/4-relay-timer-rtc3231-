@@ -3,20 +3,33 @@
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
 
+static constexpr size_t EEPROM_SIZE = 64;
+static constexpr int EEPROM_MAGIC_ADDR = 63;
+static constexpr uint8_t EEPROM_MAGIC_VALUE = 0xA5;
+
+// ESP32-WROOM safe pin map
+static constexpr uint8_t I2C_SDA_PIN = 21;
+static constexpr uint8_t I2C_SCL_PIN = 22;
+
+// Set true if your relay module is active-LOW.
+static constexpr bool RELAY_ACTIVE_LOW = false;
+static constexpr uint8_t RELAY_ON  = RELAY_ACTIVE_LOW ? LOW : HIGH;
+static constexpr uint8_t RELAY_OFF = RELAY_ACTIVE_LOW ? HIGH : LOW;
+
 RTC_DS3231 rtc;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-#define bt_clock  2
-#define bt_up     3
-#define bt_down   4
-#define bt_timer  5
-#define bt_back   6
+#define bt_clock  13
+#define bt_up     14
+#define bt_down   16
+#define bt_timer  17
+#define bt_back   18
 
-#define relay1 8
-#define relay2 9
-#define relay3 10
-#define relay4 11
-#define buzzer 13
+#define relay1 25
+#define relay2 26
+#define relay3 27
+#define relay4 33
+#define buzzer 19
 
 DateTime now;
 int hh, mm, ss, dd, bb, set_day = 1;
@@ -36,8 +49,14 @@ unsigned long lastBlinkTime = 0;
 bool blinkState = true;
 
 void setup() {
-  Wire.begin();
+  Serial.begin(115200);
+
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   rtc.begin();
+
+  if (!EEPROM.begin(EEPROM_SIZE)) {
+    Serial.println("EEPROM init failed");
+  }
   lcd.init();
   lcd.backlight();
   pinMode(bt_clock, INPUT_PULLUP);
@@ -50,10 +69,10 @@ void setup() {
   pinMode(relay3, OUTPUT); 
   pinMode(relay4, OUTPUT);
   pinMode(buzzer, OUTPUT);
-  digitalWrite(relay1, LOW);
-   digitalWrite(relay2, LOW);
-   digitalWrite(relay3, LOW);    
-   digitalWrite(relay4, LOW);
+  digitalWrite(relay1, RELAY_OFF);
+   digitalWrite(relay2, RELAY_OFF);
+   digitalWrite(relay3, RELAY_OFF);    
+   digitalWrite(relay4, RELAY_OFF);
   lcd.setCursor(0, 0); lcd.print(" relay timmer ");
   lcd.setCursor(0, 1); lcd.print(" starting ... ");
   delay(2000); lcd.clear();
@@ -91,10 +110,10 @@ void loop() {
   blinking();
   delay(100);
 
-  digitalWrite(relay1, (timer1 && alarmMode && inRange(hh, mm, Start1HH, Start1MM, Finish1HH, Finish1MM)) ? HIGH : LOW);
-  digitalWrite(relay2, (timer2 && alarmMode && inRange(hh, mm, Start2HH, Start2MM, Finish2HH, Finish2MM)) ? HIGH : LOW);
-  digitalWrite(relay3, (timer3 && alarmMode && inRange(hh, mm, Start3HH, Start3MM, Finish3HH, Finish3MM)) ? HIGH : LOW);
-  digitalWrite(relay4, (timer4 && alarmMode && inRange(hh, mm, Start4HH, Start4MM, Finish4HH, Finish4MM)) ? HIGH : LOW);
+  digitalWrite(relay1, (timer1 && alarmMode && inRange(hh, mm, Start1HH, Start1MM, Finish1HH, Finish1MM)) ? RELAY_ON : RELAY_OFF);
+  digitalWrite(relay2, (timer2 && alarmMode && inRange(hh, mm, Start2HH, Start2MM, Finish2HH, Finish2MM)) ? RELAY_ON : RELAY_OFF);
+  digitalWrite(relay3, (timer3 && alarmMode && inRange(hh, mm, Start3HH, Start3MM, Finish3HH, Finish3MM)) ? RELAY_ON : RELAY_OFF);
+  digitalWrite(relay4, (timer4 && alarmMode && inRange(hh, mm, Start4HH, Start4MM, Finish4HH, Finish4MM)) ? RELAY_ON : RELAY_OFF);
 }
 
 bool inRange(int nowH, int nowM, int startH, int startM, int endH, int endM) {
@@ -319,29 +338,44 @@ void blinking() {
 
 
 void saveRelaySettings() {
-  EEPROM.update(0, timer1);
-  EEPROM.update(1, timer2);
-  EEPROM.update(2, timer3);
-  EEPROM.update(3, timer4);
+  EEPROM.write(0, timer1);
+  EEPROM.write(1, timer2);
+  EEPROM.write(2, timer3);
+  EEPROM.write(3, timer4);
 
-  EEPROM.update(4, Start1HH); EEPROM.update(5, Start1MM);
-  EEPROM.update(6, Finish1HH); EEPROM.update(7, Finish1MM);
+  EEPROM.write(4, Start1HH); EEPROM.write(5, Start1MM);
+  EEPROM.write(6, Finish1HH); EEPROM.write(7, Finish1MM);
 
-  EEPROM.update(8, Start2HH); EEPROM.update(9, Start2MM);
-  EEPROM.update(10, Finish2HH); EEPROM.update(11, Finish2MM);
+  EEPROM.write(8, Start2HH); EEPROM.write(9, Start2MM);
+  EEPROM.write(10, Finish2HH); EEPROM.write(11, Finish2MM);
 
-  EEPROM.update(12, Start3HH); EEPROM.update(13, Start3MM);
-  EEPROM.update(14, Finish3HH); EEPROM.update(15, Finish3MM);
+  EEPROM.write(12, Start3HH); EEPROM.write(13, Start3MM);
+  EEPROM.write(14, Finish3HH); EEPROM.write(15, Finish3MM);
 
-  EEPROM.update(16, Start4HH); EEPROM.update(17, Start4MM);
-  EEPROM.update(18, Finish4HH); EEPROM.update(19, Finish4MM);
+  EEPROM.write(16, Start4HH); EEPROM.write(17, Start4MM);
+  EEPROM.write(18, Finish4HH); EEPROM.write(19, Finish4MM);
+
+  EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
+  EEPROM.commit();
 }
 
 void loadRelaySettings() {
-  timer1 = EEPROM.read(0);
-  timer2 = EEPROM.read(1);
-  timer3 = EEPROM.read(2);
-  timer4 = EEPROM.read(3);
+  if (EEPROM.read(EEPROM_MAGIC_ADDR) != EEPROM_MAGIC_VALUE) {
+    timer1 = timer2 = timer3 = timer4 = 0;
+
+    Start1HH = Start1MM = Finish1HH = Finish1MM = 0;
+    Start2HH = Start2MM = Finish2HH = Finish2MM = 0;
+    Start3HH = Start3MM = Finish3HH = Finish3MM = 0;
+    Start4HH = Start4MM = Finish4HH = Finish4MM = 0;
+
+    saveRelaySettings();
+    return;
+  }
+
+  timer1 = EEPROM.read(0) ? 1 : 0;
+  timer2 = EEPROM.read(1) ? 1 : 0;
+  timer3 = EEPROM.read(2) ? 1 : 0;
+  timer4 = EEPROM.read(3) ? 1 : 0;
 
   Start1HH = EEPROM.read(4); Start1MM = EEPROM.read(5);
   Finish1HH = EEPROM.read(6); Finish1MM = EEPROM.read(7);
@@ -354,4 +388,17 @@ void loadRelaySettings() {
 
   Start4HH = EEPROM.read(16); Start4MM = EEPROM.read(17);
   Finish4HH = EEPROM.read(18); Finish4MM = EEPROM.read(19);
+
+  // Reject invalid/corrupt saved values.
+  if (Start1HH > 23 || Start1MM > 59 || Finish1HH > 23 || Finish1MM > 59 ||
+      Start2HH > 23 || Start2MM > 59 || Finish2HH > 23 || Finish2MM > 59 ||
+      Start3HH > 23 || Start3MM > 59 || Finish3HH > 23 || Finish3MM > 59 ||
+      Start4HH > 23 || Start4MM > 59 || Finish4HH > 23 || Finish4MM > 59) {
+    timer1 = timer2 = timer3 = timer4 = 0;
+    Start1HH = Start1MM = Finish1HH = Finish1MM = 0;
+    Start2HH = Start2MM = Finish2HH = Finish2MM = 0;
+    Start3HH = Start3MM = Finish3HH = Finish3MM = 0;
+    Start4HH = Start4MM = Finish4HH = Finish4MM = 0;
+    saveRelaySettings();
+  }
 }
