@@ -8,7 +8,7 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e11">
-<title>Relay Automation Controller</title>
+<title>School Bell Controller</title>
 <style>
 :root{
   --bg:#0a0d10;--panel:#11161b;--panel2:#171d23;--line:#273039;
@@ -32,7 +32,7 @@ dialog{width:min(92vw,520px);border:1px solid var(--line);border-radius:18px;bac
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="identity"><h1>Relay Automation Controller</h1><p>ESP32 • Local control system</p></div>
+    <div class="identity"><h1>School Bell Controller</h1><p>ESP32 • Local school bell system</p></div>
     <div class="online"><span class="dot"></span><span id="net">Connected</span></div>
   </header>
 
@@ -56,7 +56,7 @@ dialog{width:min(92vw,520px);border:1px solid var(--line);border-radius:18px;bac
   </section>
 
   <section id="schedules" class="page">
-    <div class="section-head"><div><h2>Schedules</h2><p>Up to six rules per channel, with weekday control.</p></div></div>
+    <div class="section-head"><div><h2>Schedules</h2><p>Configure the bell schedule locally, with weekday control.</p></div></div>
     <div id="scheduleList"></div>
   </section>
 
@@ -76,7 +76,7 @@ dialog{width:min(92vw,520px);border:1px solid var(--line);border-radius:18px;bac
 </div>
 
 <dialog id="nameDialog">
-  <h2>Rename channel</h2>
+  <h2>Rename output</h2>
   <label>Channel name<input id="channelName" type="text" maxlength="23"></label>
   <div class="actions"><button onclick="nameDialog.close()">Cancel</button><button class="primary" onclick="saveName()">Save</button></div>
 </dialog>
@@ -116,7 +116,7 @@ function render(){
   state.channels.forEach((c,i)=>{
     const activeSchedules=c.schedules.filter(s=>s.enabled).length;
     const el=document.createElement('article'); el.className='channel';
-    el.innerHTML='<div class="row"><div><div class="eyebrow">CHANNEL '+pad(i+1)+'</div><h3>'+esc(c.name)+'</h3></div><span class="state '+(c.state?'on':'')+'">'+(c.state?'RUNNING':'STOPPED')+'</span></div>'+
+    el.innerHTML='<div class="row"><div><div class="eyebrow">BELL OUTPUT+'</div><h3>'+esc(c.name)+'</h3></div><span class="state '+(c.state?'on':'')+'">'+(c.state?'RUNNING':'STOPPED')+'</span></div>'+
       '<div class="next"><span>AUTOMATION</span><b>'+activeSchedules+' active schedule'+(activeSchedules===1?'':'s')+' • '+c.modeName+'</b></div>'+
       '<div class="mode">'+modeBtn(i,0,'AUTO',c.mode)+modeBtn(i,1,'ON',c.mode)+modeBtn(i,2,'OFF',c.mode)+'</div>'+
       '<button class="smallbtn" onclick="renameChannel('+i+')">Rename channel</button>';
@@ -158,7 +158,7 @@ function renderWeek(){week.innerHTML='';dayNames.forEach((d,i)=>{const b=documen
 async function saveSchedule(){const a=startTime.value.split(':'),b=endTime.value.split(':');await post('/api/schedule',{channel:editChannel,slot:editSlot,enabled:enabled.checked,daysMask:editDays,startMinute:(+a[0])*60+(+a[1]),endMinute:(+b[0])*60+(+b[1])});scheduleDialog.close();await refresh()}
 async function syncTime(){const d=new Date();await post('/api/time',{year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate(),hour:d.getHours(),minute:d.getMinutes(),second:d.getSeconds()});await refresh();alert('RTC synchronized')}
 async function loadEvents(){try{const r=await fetch('/api/events',{cache:'no-store'}),d=await r.json();events.innerHTML=d.events.length?d.events.map(e=>'<div class="event"><time>'+esc(e.time)+'</time><div>'+esc(e.message)+'</div></div>').join(''):'<div class="empty">No events yet.</div>'}catch(e){events.innerHTML='<div class="empty">Could not load history.</div>'}}
-async function factoryReset(){if(!confirm('Restore all relay settings to defaults?'))return;await post('/api/factory-reset',{confirm:true});await refresh();alert('Factory defaults restored')}
+async function factoryReset(){if(!confirm('Restore all school bell settings to defaults?'))return;await post('/api/factory-reset',{confirm:true});await refresh();alert('Factory defaults restored')}
 
 refresh();setInterval(refresh,1000);
 </script>
