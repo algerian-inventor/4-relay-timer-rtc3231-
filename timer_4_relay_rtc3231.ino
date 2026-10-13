@@ -9,7 +9,7 @@
 // School Bell Controller
 // Hardware: ESP32 + DS3231 + ONE relay module
 // Interface: ESP32 Wi-Fi Access Point + local web dashboard
-// No LCD, no buttons, no buzzer.
+// No local display or physical control panel.
 // ============================================================
 
 // ---------- Hardware ----------
