@@ -8,9 +8,8 @@ namespace Storage {
 
   inline void defaults(PersistedSettings& settings) {
     settings = PersistedSettings{};
-    const char* names[CHANNEL_COUNT] = {"Channel 1", "Channel 2", "Channel 3", "Channel 4"};
     for (uint8_t i = 0; i < CHANNEL_COUNT; ++i) {
-      strncpy(settings.channels[i].name, names[i], sizeof(settings.channels[i].name) - 1);
+      strncpy(settings.channels[i].name, "School Bell", sizeof(settings.channels[i].name) - 1);
       settings.channels[i].mode = RelayMode::AUTO;
       settings.channels[i].outputState = false;
       for (uint8_t s = 0; s < MAX_SCHEDULES; ++s) {
