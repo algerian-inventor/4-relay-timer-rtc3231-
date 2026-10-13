@@ -72,15 +72,23 @@ The LCD always shows the currently selected channel.
 
 ## Safety
 
-The firmware drives all relay outputs to the OFF state before loading persisted configuration.
-
-Relay boards vary. If yours is active-low, set:
+The firmware now defaults to the common **active-LOW relay-module** convention:
 
 ```cpp
 static constexpr bool RELAY_ACTIVE_HIGH = false;
 ```
 
-in `config.h`.
+At boot, the OFF logic level is written **before** each relay GPIO is configured as an output. This reduces startup/reset glitches.
+
+For a fail-safe product, firmware is only one layer. The hardware should also guarantee:
+
+- use **COM + NO** for the automatic bell contact so an unpowered relay opens the circuit;
+- add an external bias resistor on each relay input so the input cannot float when the ESP32 is unpowered;
+- for active-LOW modules, bias the input to the module's verified OFF level;
+- keep the manual bell path independent of the ESP32 so a controller failure does not remove manual operation;
+- use an appropriately rated isolated relay/contactor stage for the real bell load.
+
+Important: some relay modules remain powered from a separate 5 V rail while the ESP32 is off. In that condition, a floating or back-powered IN pin can energize the relay. Verify the exact module before installation.
 
 Test with LEDs or another low-voltage load first. Do not connect mains voltage until relay polarity, isolation, wiring and enclosure safety are verified.
 
