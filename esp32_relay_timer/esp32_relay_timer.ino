@@ -270,6 +270,11 @@ static void setupApi() {
     sendOk();
   });
 
+  server.on("/api/stop", HTTP_POST, []() {
+    stopBell("manual web stop");
+    sendOk();
+  });
+
   server.on("/api/automation", HTTP_POST, []() {
     JsonDocument doc;
     if (!readJson(doc)) return;
@@ -333,6 +338,9 @@ static void setupApi() {
       server.send(500, "application/json", "{\"error\":\"storage_failed\"}");
       return;
     }
+
+    // Editing the schedule must not create an immediate surprise ring in this minute.
+    markCurrentMinuteTriggered();
 
     eventLog.add(timestampNow(), "Bell event " + String(slot + 1) + " updated to " + minuteText(event.minuteOfDay));
     sendOk();
@@ -457,6 +465,7 @@ void setup() {
   writeRelay(false);
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setTimeOut(50);
   rtcReady = rtc.begin();
   rtcValid = rtcReady && !rtc.lostPower();
 
