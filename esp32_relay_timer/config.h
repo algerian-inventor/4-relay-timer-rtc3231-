@@ -11,8 +11,10 @@ static constexpr uint8_t LCD_ADDRESS = 0x27;
 
 // Relays
 static constexpr uint8_t RELAY_PINS[CHANNEL_COUNT] = {25, 26, 27, 33};
-// Set false for the common active-LOW relay modules.
-static constexpr bool RELAY_ACTIVE_HIGH = true;
+
+// Product default: common 5 V relay modules are usually active-LOW.
+// OFF = HIGH, ON = LOW. Change this only after verifying the exact module.
+static constexpr bool RELAY_ACTIVE_HIGH = false;
 
 // Buttons (INPUT_PULLUP)
 static constexpr uint8_t BTN_CLOCK_PIN = 13;
@@ -30,7 +32,7 @@ static constexpr uint8_t AP_MAX_CLIENTS = 4;
 
 // Product
 static constexpr char DEVICE_NAME[] = "Relay Automation Controller";
-static constexpr char FIRMWARE_VERSION[] = "1.0.0-alpha.1";
+static constexpr char FIRMWARE_VERSION[] = "1.0.0-alpha.2";
 static constexpr uint32_t SETTINGS_SCHEMA_VERSION = 1;
 static constexpr uint32_t SETTINGS_MAGIC = 0x524C5931; // RLY1
 
